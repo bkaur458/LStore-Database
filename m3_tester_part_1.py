@@ -62,10 +62,10 @@ for i in range(num_threads):
 
 # wait for workers to finish
 for i in range(num_threads):
-    print("Calling join for worker: " + str(i+1))
+    #print("Calling join for worker: " + str(i+1))
     transaction_workers[i].join()
 
-print("Join finished")
+#print("Join finished")
 
 
 # Check inserted records using select query in the main thread outside workers

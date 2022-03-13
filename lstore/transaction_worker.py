@@ -29,16 +29,16 @@ class TransactionWorker:
     def run(self):
         # here you need to create a thread and call __run
         self.t = threading.Thread(target=self.__run, daemon=False)
-        print("Starting thread: " + str(self.worker_id))
+        #print("Starting thread: " + str(self.worker_id))
         self.t.start()
     
     """
     Waits for the worker to finish
     """
     def join(self):
-        print("In join of: " + str(self.worker_id) )
+        #print("In join of: " + str(self.worker_id) )
         self.t.join()
-        print("Join done for: " + str(self.worker_id))
+        #print("Join done for: " + str(self.worker_id))
 
     def __run(self):
         for transaction in self.transactions:

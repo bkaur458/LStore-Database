@@ -66,7 +66,6 @@ class Query:
     def insert(self, *columns):
 
         if columns[0] in self.table.key_dict.keys():
-            print("Already inserted: " + str(columns[0]))
             return False
         # get current page range, current page dictionary, current base page count
         key_column = self.table.key
@@ -133,8 +132,6 @@ class Query:
         '''
         self.table.rid += 1
 
-        print("INSRTED KEY IN QUERY : " + str(columns[0]))
-
         return True, self.table.rid - 1
 
     """
@@ -163,8 +160,7 @@ class Query:
 
         #index
         all_rids = self.table.index.locate(col, index_value)
-        print("All rids for: " + str(index_value) + " : " + str(all_rids))
-
+        #print(all_rids)
 
         # go through all the records that have the needed value for a given column
         for a_rid in all_rids:
@@ -174,8 +170,8 @@ class Query:
             indirection = self.table.bufferpool.access(indir_id, None)
             rid = indirection.read(needed_slot)
 
-            # if -1 == rid or self.table.tps.get(a_rid) == rid:
-            if -1 == rid or 0==rid:
+            if -1 == rid or self.table.tps.get(a_rid) == rid:
+            # if -1 == rid or 0==rid:
                 for col_new in range(3, len(query_columns)+3):  
                     if query_columns[col_new - 3] == 1:
                         query_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(col_new) + "-"

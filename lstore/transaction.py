@@ -101,7 +101,7 @@ class Transaction:
                     # if False (aka transaction aborted), then return
                     if not self.set_shared_rid(all_rids[i]):
                         print('select aborted')
-                        return
+                        self.abort()
 
                 result = query(*args)
                 # If the query has failed the transaction should abort
@@ -151,7 +151,7 @@ class Transaction:
                     # if False (aka transaction aborted), then return
                     # print('rid: ', self.table.rid)
                     if not self.set_exclusive_rid(self.table.rid):
-                        return
+                        self.abort()
                     # print('correct insert')
 
 
@@ -185,8 +185,7 @@ class Transaction:
                     rid = self.table.key_dict[args[0]]
                     # if False (aka transaction aborted), then return
                     if not self.set_exclusive_rid(rid):
-                        print("Could not get exclusive lock for " + str(self.transaction_id) +" : " +str(args[0]))
-                        return
+                        self.abort()
 
                     #3. Adding action type
                     fin.write(bytearray((2).to_bytes(4, 'big', signed=True)))
@@ -218,7 +217,7 @@ class Transaction:
                     rid = self.table.key_dict[args[0]]
                     # if False (aka transaction aborted), then return
                     if not self.set_exclusive_rid(rid):
-                        return
+                        self.abort()
 
                     #3. Adding action type
                     fin.write(bytearray((3).to_bytes(4, 'big', signed=True)))
@@ -258,11 +257,11 @@ class Transaction:
 
                 # If the query has failed the transaction should abort
                 if result == False:
-                    if("insert" in str(query)):
-                        print("Inserted failed on: " + str(args[0]))
+                    # if("insert" in str(query)):
+                    #     print("Inserted failed on: " + str(args[0]))
                     return self.abort()
 
-                if("insert" in str(query)):
+                if("insert" in str(query) and args[0]==92106429 ):
                     print("Inserted key: " + str(args[0]))
 
                 #Only if query successful, append to the stack
@@ -383,11 +382,11 @@ class Transaction:
 
     def set_exclusive_rid(self, rid):
         # if rid present in lock manager, abort
-        if rid in self.table.exclusive_lock_manager:
-            # print('abortttt')
-            return self.abort()
-        if rid in self.table.shared_lock_manager:
+        if rid in self.table.exclusive_lock_manager.keys():
+            return False
+        elif rid in self.table.shared_lock_manager.keys():
             if self.transaction_id in self.table.shared_lock_manager[rid] and len(self.table.shared_lock_manager[rid])==1:
+                self.table.exclusive_lock_manager[rid] = self.transaction_id
                 return True
             else:
                 return False
@@ -399,11 +398,11 @@ class Transaction:
 
     def set_shared_rid(self, rid):
         # if rid is exclusively locked, abort
-        if rid in self.table.exclusive_lock_manager: 
-            return self.abort()
+        if rid in self.table.exclusive_lock_manager.keys(): 
+            return False
         
         #If rid present in shared lock keys
-        if rid in self.table.shared_lock_manager:
+        if rid in self.table.shared_lock_manager.keys():
             #if this transaction is not present in the list of the xcats that have this shared lock, add it
             if self.transaction_id not in self.table.shared_lock_manager[rid]:
                 self.table.shared_lock_manager[rid].append(self.transaction_id)
