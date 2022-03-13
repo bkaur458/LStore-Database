@@ -109,13 +109,11 @@ class Table:
         base_page_id1 = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
         curr_base_page1 = self.bufferpool.access(base_page_id1, None)
         binary_list = list(f'{curr_base_page1.read(base_slot):08b}')
-
         curr_base_page1.pin_count -= 1
+
         base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(1) + "-"
         curr_base_page = self.bufferpool.access(base_page_id, None)
         tail_rid = curr_base_page.read(base_slot)
-
-
         curr_base_page.pin_count -= 1
 
         tail_page_range, tail_page, tail_slot = self.page_directory[tail_rid]

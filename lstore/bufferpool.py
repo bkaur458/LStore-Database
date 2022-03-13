@@ -49,7 +49,7 @@ class Bufferpool:
                 # print('in2')
                 # set path name
                 name = os.path.join(self.path, page_id + '.txt')
-                # create new file
+                # create new file 
                 with open(name, "wb") as f:
                     # write bytearray to file
                     f.write(page.data)

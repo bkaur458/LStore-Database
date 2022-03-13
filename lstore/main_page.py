@@ -27,11 +27,11 @@ class MainPage:
         if self.num_records < MAX_RECORDS:
             return True
         else: 
-            return False
+            return False 
 
     # for every base page or tail page created, automatically create empty pages for every column (with no records)
     # this function is called in the constructor above 
-    def create_pages(self): 
+    def create_pages(self):  
         base_rids = []
         for col in range(1,self.num_pages+1):
             # if table is new

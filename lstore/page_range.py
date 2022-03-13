@@ -23,7 +23,7 @@ class PageRange:
         else:
             curr_path = os.path.join(self.bufferpool.path, "metadata")
 
-            metadata_path = os.path.join(curr_path, 'num_base_pages.txt')
+            metadata_path = os.path.join(curr_path, 'num_base_pages.txt') 
             self.num_base_pages = int(self.bufferpool.read_disk(metadata_path))
 
         self.num_columns = num_columns
