@@ -1,4 +1,6 @@
+from email.mime import base
 import queue
+from typing import final
 from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
@@ -214,28 +216,50 @@ class Query:
 
         #index
         all_rids = self.table.index.locate(col, index_value)
-        #print(all_rids)
 
-        # go through all the records that have the needed value for a given column
-        for a_rid in all_rids:
+        #only considering primary select fisrt
+        #so index value is just primary key
+        base_rid = all_rids[0]
+        previous_rid = base_rid
+        final_version_flag = 0
+
+        for current_version in range(0, abs(relative_version)+1):
+            if final_version_flag == 1:       #TODO: make sure this breaks out the for loop
+                break
             page_dict = []
-            [needed_range, needed_base, needed_slot] = self.table.page_directory[a_rid]
-            indir_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(1) + "-"
-            indirection = self.table.bufferpool.access(indir_id, None)
-            rid = indirection.read(needed_slot)
+            [needed_range, needed_base, needed_slot] = self.table.page_directory[previous_rid]
+            if previous_rid == base_rid:
+                #First read the indirection column
+                indir_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(1) + "-"
+                indirection = self.table.bufferpool.access(indir_id, None)
+                indirection_value = indirection.read(needed_slot)
+            #Need to read a tail page
+            else: 
+                #First read the indirection column
+                indir_id = "t" + str(needed_range) + "-" + str(needed_base) + "-" + str(1) + "-"
+                indirection = self.table.bufferpool.access(indir_id, None)
+                indirection_value = indirection.read(needed_slot)
+                ##print("indirection value in new condition: " + str(indirection_value))
 
-            if -1 == rid or self.table.tps.get(a_rid) == rid:
-            # if -1 == rid or 0==rid:
+            # Case 1: if rid was never updated or base record has been reached, i.e. cannot go beyond in history
+            if indirection_value == -1 or indirection_value == base_rid:
+                ##print("Version_iteration: " + str(current_version) + " : in Case 1")
+                [needed_range, needed_base, needed_slot] = self.table.page_directory[base_rid]
+                final_version_flag = 1   #no more versions beyond this
                 for col_new in range(3, len(query_columns)+3):  
                     if query_columns[col_new - 3] == 1:
                         query_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(col_new) + "-"
                         query_page = self.table.bufferpool.access(query_id, None)
                         page_dict.append(query_page)
+                out.clear()
                 out.append(Record(0,0,self.select_read(needed_slot, page_dict)))
+            
+            # Case 2: if rid was updated, and there is still a tail version to read
             else:
-            # get tail page range, tail page, and tail slot from page directory using rid at indirection column of its base page
-
-                tail_page_range, tail_base_page, tail_slot = self.table.page_directory[rid] # wont always be the same range
+                ##print("Version_iteration: " + str(current_version) + " : in Case 2")
+                # get tail page range, tail page, and tail slot from page directory using indirection_value at indirection column of its base page
+                previous_rid = indirection_value
+                tail_page_range, tail_base_page, tail_slot = self.table.page_directory[indirection_value] # wont always be the same range
                 page_dict = []
                 for col_new in range(2, len(query_columns)+2):
                     if query_columns[col_new - 2] == 1:
@@ -243,6 +267,7 @@ class Query:
                         query_page = self.table.bufferpool.access(query_id, None)
                         page_dict.append(query_page)
 
+                out.clear()
                 out.append(Record(0,0,self.select_read(tail_slot, page_dict)))
             indirection.pin_count -= 1
 
@@ -367,6 +392,10 @@ class Query:
         #Let new tail record point to the previous one
         tail_page_id = "t" + str(base_page_range) + "-" + str(num_tail_pages) + "-" + str(1) + "-"
         curr_tail_page = self.table.bufferpool.access(tail_page_id, None)
+        #Have the first tail record point to the base rid
+        if tail_page_indirection == -1:
+            base_rid = self.table.key_dict[primary_key]
+            tail_page_indirection = base_rid
         curr_tail_page.write(tail_page_indirection) #first update will be -1 // not sure what we want
         self.table.page_directory[self.table.rid] = [base_page_range, num_tail_pages, curr_tail_page.num_records - 1]
 

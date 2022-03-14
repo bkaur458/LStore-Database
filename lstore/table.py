@@ -105,6 +105,9 @@ class Table:
         pass
 
     def merge(self, record):
+
+        print("**********MERGE HAPPENING************")
+
         base_page_range, base_page, base_slot = self.page_directory[record]
         base_page_id1 = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
         curr_base_page1 = self.bufferpool.access(base_page_id1, None)

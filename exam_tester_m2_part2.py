@@ -1,5 +1,6 @@
 from lstore.db import Database
 from lstore.query import Query
+import sys
 
 from random import choice, randint, sample, seed
 
@@ -15,7 +16,7 @@ query = Query(grades_table)
 # dictionary for records to test the database: test directory
 records = {}
 
-number_of_records = 1000
+number_of_records = 100
 number_of_aggregates = 100
 number_of_updates = 1
 
@@ -23,6 +24,8 @@ seed(3562901)
 for i in range(0, number_of_records):
     key = 92106429 + i
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
+    if key == 92106429:
+        print("records[key] in part2: " + str(records[key]) )
 
 # Simulate updates
 updated_records = {}
@@ -42,9 +45,11 @@ for key in keys:
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
             error = True
-    if error:
-        print('select error on', key, ':', record, ', correct:', records[key])
+    if error and key == 92106429:
+        print('select error on', key, ':', record.columns, ', correct:', records[key])
 print("Select for version -1 finished")
+
+sys.exit()
 
 # Check records that were presisted in part 1
 for key in keys:
