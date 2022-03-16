@@ -24,8 +24,6 @@ seed(3562901)
 for i in range(0, number_of_records):
     key = 92106429 + i
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
-    if key == 92106429:
-        print("records[key] in part2: " + str(records[key]) )
 
 # Simulate updates
 updated_records = {}
@@ -38,40 +36,38 @@ for _ in range(number_of_updates):
             updated_records[key][j] = value
 keys = sorted(list(records.keys()))
 
-# Check records that were presisted in part 1
-for key in keys:
-    record = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)[0]
-    error = False
-    for i, column in enumerate(record.columns):
-        if column != records[key][i]:
-            error = True
-    #if error and key == 92106429:
-    if error:
-        print('select error on', key, ':', record.columns, ', correct:', records[key])
-print("Select for version -1 finished")
+# # Check records that were presisted in part 1
+# for key in keys:
+#     record = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)[0]
+#     error = False
+#     for i, column in enumerate(record.columns):
+#         if column != records[key][i]:
+#             error = True
+#     #if error and key == 92106429:
+#     if error:
+#         print('select error on', key, ':', record.columns, ', correct:', records[key])
+# print("Select for version -1 finished")
 
-# Check records that were presisted in part 1
-for key in keys:
-    record = query.select_version(key, 0, [1, 1, 1, 1, 1], -2)[0]
-    error = False
-    for i, column in enumerate(record.columns):
-        if column != records[key][i]:
-            error = True
-    if error:
-        print('select error on', key, ':', record, ', correct:', records[key])
-print("Select for version -2 finished")
+# # Check records that were presisted in part 1
+# for key in keys:
+#     record = query.select_version(key, 0, [1, 1, 1, 1, 1], -2)[0]
+#     error = False
+#     for i, column in enumerate(record.columns):
+#         if column != records[key][i]:
+#             error = True
+#     if error:
+#         print('select error on', key, ':', record, ', correct:', records[key])
+# print("Select for version -2 finished")
 
-for key in keys:
-    record = query.select_version(key, 0, [1, 1, 1, 1, 1], 0)[0]
-    error = False
-    for i, column in enumerate(record.columns):
-        if column != updated_records[key][i]:
-            error = True
-    if error:
-        print('select error on', key, ':', record, ', correct:', records[key])
-print("Select for version 0 finished")
-
-sys.exit()
+# for key in keys:
+#     record = query.select_version(key, 0, [1, 1, 1, 1, 1], 0)[0]
+#     error = False
+#     for i, column in enumerate(record.columns):
+#         if column != updated_records[key][i]:
+#             error = True
+#     if error:
+#         print('select error on', key, ':', record, ', correct:', records[key])
+# print("Select for version 0 finished")
 
 for i in range(0, number_of_aggregates):
     r = sorted(sample(range(0, len(keys)), 2))

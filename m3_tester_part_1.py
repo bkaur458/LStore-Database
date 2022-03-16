@@ -23,7 +23,6 @@ num_threads = 8
 
 # create index on the non primary columns
 try:
-    grades_table.index.create_index(1)
     grades_table.index.create_index(2)
     grades_table.index.create_index(3)
     grades_table.index.create_index(4)
@@ -62,15 +61,11 @@ for i in range(num_threads):
 
 # wait for workers to finish
 for i in range(num_threads):
-    #print("Calling join for worker: " + str(i+1))
     transaction_workers[i].join()
-
-#print("Join finished")
 
 
 # Check inserted records using select query in the main thread outside workers
 for key in keys:
-    print("Select for key: " + str(key))
     record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
     error = False
     for i, column in enumerate(record.columns):

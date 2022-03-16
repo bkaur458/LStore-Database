@@ -8,8 +8,8 @@ from random import choice, randint, sample, seed
 db = Database()
 db.open('./ECS165')
 
-# Getting the existing Grades table
-grades_table = db.get_table('Grades')
+# creating grades table
+grades_table = db.create_table('Grades', 5, 0)
 
 # create a query class for the grades table
 query = Query(grades_table)
@@ -20,7 +20,7 @@ records = {}
 number_of_records = 2
 number_of_transactions = 2
 number_of_operations_per_record = 1
-num_threads = 2
+num_threads = 2 
 
 keys = []
 records = {}
@@ -38,7 +38,7 @@ for i in range(number_of_transactions):
     transactions.append(Transaction())
 
 for i in range(num_threads):
-    transaction_workers.append(TransactionWorker())
+    transaction_workers.append(TransactionWorker(i+1))
 
 # x update on every column
 updated_columns = [None, 200, None, None, None]
