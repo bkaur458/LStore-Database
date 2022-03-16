@@ -8,7 +8,7 @@ db.open('./ECS165')
 # Create a table  with 10 columns
 #   Student Id and 9 grades
 #   The first argument is name of the table
-#   The second argument is the number of columns
+#   The second argument is the number of columns 
 #   The third argument is determining the which columns will be primay key
 #       Here the first column would be student id and primary key
 grades_table = db.create_table('Grades', 10, 0)

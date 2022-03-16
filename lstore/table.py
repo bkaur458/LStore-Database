@@ -6,7 +6,6 @@ from lstore.page_range import PageRange
 from lstore.config import *
 import os
 import pickle
-from threading import RLock
 
 class Record:
 
@@ -14,6 +13,7 @@ class Record:
         self.rid = rid
         self.key = key
         self.columns = columns
+
     def insert_record(self, table):
         pass
 
@@ -28,15 +28,15 @@ class Table:
         self.name = name
         # which column is primary key
         self.key = key
-        self.rid = 0
+        self.rid = 1
         # + 2 to also acccount for the indirection column and schema encoding column // 1 = indirection & 2 = schema
         # Value in the indirection column will contain latest RID of a record, if a record was never updated, will contain -1
         # Schema encoding column will contain 1 if a record was ever updated and 0 if never updated
         self.num_columns = num_columns
 
-        self.lock_manager = {}
-        self.lock_counter = {}
-        self.lock = RLock()
+        self.shared_lock_manager = {}
+        self.exclusive_lock_manager = {}
+
         #Number of page ranges this table
         self.num_of_ranges = 0
         self.is_new = is_new
@@ -44,20 +44,20 @@ class Table:
         self.bufferpool = bufferpool
         self.log_serial_no = 0
         self.transaction_id_ctr = 0
+        self.workder_id_ctr = 0
         self.merged_range = 0
 
-
-        #To store RID as key and page range no, page no, slot no as a list of values
+        # To store RID as key and page range no, page no, slot no as a list of values
         # if new table, set original values
         if is_new:
             self.num_of_ranges = 0
             self.page_directory = {}
             self.key_dict = {}
             self.tps_data = {}
-            self.deleted_keys = {}
             self.pra = dict()
             self.tps = {}
             self.se_tps = set() 
+            self.deleted_keys = {}
 
         # old table --> load in from disk
         else:
@@ -105,18 +105,21 @@ class Table:
         pass
 
     def merge(self, record):
+
+        #print("\n**********MERGE HAPPENING************")
+
         base_page_range, base_page, base_slot = self.page_directory[record]
         base_page_id1 = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
         curr_base_page1 = self.bufferpool.access(base_page_id1, None)
-        binary_list = list(f'{curr_base_page1.read(base_slot):08b}')
-
+        binary_list = list(f'{curr_base_page1.read(base_slot):016b}')
         curr_base_page1.pin_count -= 1
+
         base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(1) + "-"
         curr_base_page = self.bufferpool.access(base_page_id, None)
         tail_rid = curr_base_page.read(base_slot)
-
-
         curr_base_page.pin_count -= 1
+
+        #print("Base RID: " + str(record) + ", Tail RID: " + str(tail_rid))
 
         tail_page_range, tail_page, tail_slot = self.page_directory[tail_rid]
         for x in range(self.num_columns + 1):
@@ -155,54 +158,7 @@ class Table:
                 self.curr_range = PageRange(r, self.num_columns + 2, self.bufferpool, self.is_new, self.index, self.key_dict, self.key)
             return self.curr_range
 
-    def increment_rid(self):
-        self.rid += 1
-        rid = self.rid
-        return(rid)
 
-    def set_exclusive_rid(self, rid, locked_rids):
-    # if rid present in lock manager, abort
-        # self.lock.acquire()
-        if rid in self.lock_manager:
-            if self.lock_manager[rid] == 'X': 
-                if rid in locked_rids:
-                    return True
-                else:
-                    return False
-            if self.lock_manager[rid] == 'S' and rid in locked_rids and self.lock_counter[rid] == 1:
-                self.lock_manager[rid] = 'X' 
-                # self.lock.release() 
-                return True
-            else:
-                # print('abortttt')
-                # self.lock.release() 
-                return False
-        # else place exclusive lock on rid in lock manager
-        else:
-            # print('chillin')
-            self.lock_manager[rid] = 'X'
-        # self.lock.release() 
-        return True
-
-    def set_shared_rid(self, rid, locked_rids):
-        # if rid present in lock manager
-        # self.lock.acquire()
-        if rid in self.lock_manager:
-            # if rid isn't exclusively locked, abort
-            if self.lock_manager[rid] == 'X':
-                # self.lock.release() 
-                if rid in locked_rids:
-                    return True        
-                else:
-                    return False
-            # otherwise keep shared lock
-            else:
-                return True
-        # if rid not present, make it shared lock
-        else:
-            self.lock_manager[rid] = 'S'
-        # self.lock.release() 
-        return True
         
 #ASSUMPTIONS
 

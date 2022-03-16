@@ -89,22 +89,12 @@ class Query:
 
         # print(self.table.curr_range.num_base_pages)
         for x in range(3, len(columns)+3):
-            self.table.index.insert(self.table.rid, columns[x-3], x)
+            self.table.index.insert(self.table.rid, columns[x-3], x)  #issue shared table.rid
             page_id = "b" + str(self.table.num_of_ranges) + "-" + str(curr_base_page) + "-" + str(x) + "-"
             curr_page = self.table.bufferpool.access(page_id, None)
             curr_page.write(columns[x-3])
             # set dirty bit
             #curr_page.is_dirty = True
-
-            # insert record into index
-            # if index doesn't exist, create one
-            # if self.table.index.indices[x-3]:
-            #     self.table.index.create_index(x-3)
-            # rid = self.table.rid
-            # slot = curr_page.num_records
-            # value = curr_page.data[slot*8 : (slot*8+8)]
-            # self.table.index.insert(rid, value, x-3)
-
             curr_page.pin_count -= 1
 
         # write 0 to schema encoding column, since initially inserted records have never been updated
@@ -154,7 +144,6 @@ class Query:
 
         #index
         all_rids = self.table.index.locate(col, index_value)
-        #print(all_rids)
 
         # go through all the records that have the needed value for a given column
         for a_rid in all_rids:
@@ -214,6 +203,12 @@ class Query:
         rid = self.table.key_dict[primary_key]
         # get base page indexes
         base_page_range, base_page, base_slot = self.table.page_directory[rid]
+
+        #print("\nUpdate no: " + str(update_no))
+
+        #if (self.table.tps.get(rid) != None):
+            #print("\nTPS of the Rid in the beginning of update")
+            #print(self.table.tps.get(rid))
         binary_list = ['0'] * 16
         if (self.table.merged_range == base_page_range and rid in self.table.pra[base_page_range][1]) or (self.table.tps.get(rid) != None):
             if rid in self.table.se_tps:
@@ -240,17 +235,15 @@ class Query:
         else:
             tail_page_id = "t" + str(base_page_range) + "-" + str(num_tail_pages) + "-" + str(len(columns)) + "-"
             curr_tail_page = self.table.bufferpool.access(tail_page_id, None)
-            
             if not curr_tail_page.has_capacity():
                 for col in range(1, self.table.num_columns + 2):
                     curr_page = Page(base_page_range, num_tail_pages + 1, col, 0, None)
                     self.table.bufferpool.access(curr_page.page_id, curr_page)
                     curr_page.pin_count -= 1
-
                 self.table.pra[base_page_range][0] += 1
                 num_tail_pages += 1
-
             curr_tail_page.pin_count -= 1
+
         if columns[key_column] != None:
             # set value of key_dict at column of primary key column to the value of the rid at primary_key
             self.table.key_dict[columns[key_column]] = self.table.key_dict.pop(primary_key)
@@ -258,12 +251,12 @@ class Query:
 
         base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(1) + "-"
         curr_base_page = self.table.bufferpool.access(base_page_id, None)
-        #original indirection value before update
+        # original indirection value before update
         tail_page_indirection = curr_base_page.read(base_slot)
         # change indirection column of current base record to point to the new tail page rid
         curr_base_page.overwrite(base_slot, self.table.rid)
+        curr_base_page.pin_count -= 1     
 
-        curr_base_page.pin_count -= 1       
         # loop through columns, start at column 3 because columns 1-2 are for indirection and schema encoding
         for x in range(3, len(columns) + 3):
             # if column value at index is None, don't update that column (cumulative tail records)  
@@ -302,9 +295,7 @@ class Query:
                 curr_tail_page.write(columns[x-3])
                 curr_tail_page.pin_count -= 1
                 if binary_list[x-3] == '0':
-                    binary_list[x-3] = '1' 
-                    # if rid == 8646:
-                    #     print(binary_list, columns[x-3])
+                    binary_list[x-3] = '1'
 
         base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
         curr_base_page = self.table.bufferpool.access(base_page_id, None)
@@ -318,27 +309,32 @@ class Query:
         if tail_page_indirection == -1:
             base_rid = self.table.key_dict[primary_key]
             tail_page_indirection = base_rid
-        curr_tail_page.write(tail_page_indirection) #first update will be -1 // not sure what we want
+        curr_tail_page.write(tail_page_indirection) #first update will be base rid
         self.table.page_directory[self.table.rid] = [base_page_range, num_tail_pages, curr_tail_page.num_records - 1]
 
         # increment rid
         if rid not in self.table.pra[base_page_range][1]:
             self.table.pra[base_page_range][1].add(rid)
+            '''
+            print("\n\nself.table.pra[base_page_range][1] " + str(self.table.pra[base_page_range][1]))
+            print("len: " + str(len(self.table.pra[base_page_range][1])))
+            print("curr_tail_page.num_records " + str(curr_tail_page.num_records))
+            '''
             if len(self.table.pra[base_page_range][1]) > 800 and curr_tail_page.num_records == 512:
+                print("Condition for merge satisfied")
                 updated_records = self.table.pra[base_page_range][1].copy()
                 self.table.pra[base_page_range][1].clear()
-                threading.Thread(target=self.queue_merge, args=(base_page_range, updated_records,), daemon=True).start()
+                threading.Thread(target=self.queue_merge, args=(base_page_range, updated_records), daemon=True).start()
         curr_tail_page.pin_count -= 1
 
         self.table.rid += 1
         return True
 
     def queue_merge(self, page_range, updated_records):
+        #print("**********\nQUEUE MERGE HAPPENING************")
         self.table.merged_range = page_range
         for record in updated_records:
             self.table.merge(record)
-
-
 
     """
     :param start_range: int         # Start of the key range to aggregate 
