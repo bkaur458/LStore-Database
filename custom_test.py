@@ -63,5 +63,8 @@
 # #print(curr_range.tail_pages[1]) Will Give Key Error
 # '''
 
-list = [1,2,3]
-print(len(list))
+f = open("rid.txt", "w+")
+f.write(str(4))
+
+f.seek(0)
+print(f.read())

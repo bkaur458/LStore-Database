@@ -45,7 +45,7 @@ class Table:
         self.log_serial_no = 0
         self.transaction_id_ctr = 0
         self.merged_range = 0
-
+        self.original_values = {}
 
         #To store RID as key and page range no, page no, slot no as a list of values
         # if new table, set original values
@@ -91,9 +91,19 @@ class Table:
             with open(metadata_path, "rb") as f:
                 self.deleted_keys = pickle.load(f)
 
+            metadata_path = os.path.join(curr_path, 'original_values.pickle')
+            with open(metadata_path, "rb") as f:
+                self.original_values = pickle.load(f)
+
             # get num_of_ranges from disk
             metadata_path = os.path.join(curr_path, 'num_of_ranges.txt')
             self.num_of_ranges = int(self.bufferpool.read_disk(metadata_path))
+
+            # metadata_path = os.path.join(curr_path, 'rid.txt')
+            # with open(metadata_path, "rb") as f:
+            #     f.seek(0)
+            #     rid = f.read(4)
+            #     self.rid = int.from_bytes(rid, byteorder='big', signed=True)
 
         # stores physical page id as key and page range no, main page no, page no as a list of values
         # self.physical_page_directory = {}
@@ -108,7 +118,7 @@ class Table:
         base_page_range, base_page, base_slot = self.page_directory[record]
         base_page_id1 = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
         curr_base_page1 = self.bufferpool.access(base_page_id1, None)
-        binary_list = list(f'{curr_base_page1.read(base_slot):08b}')
+        binary_list = list(f'{curr_base_page1.read(base_slot):016b}')
 
         curr_base_page1.pin_count -= 1
         base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(1) + "-"

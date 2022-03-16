@@ -82,12 +82,15 @@ class Query:
                 self.table.curr_range.num_base_pages += 1
                 curr_base_page += 1
 
+        self.table.original_values[self.table.rid] = []
+
         # print(self.table.curr_range.num_base_pages)
         for x in range(3, len(columns)+3):
             self.table.index.insert(self.table.rid, columns[x-3], x)
             page_id = "b" + str(self.table.num_of_ranges) + "-" + str(curr_base_page) + "-" + str(x) + "-"
             curr_page = self.table.bufferpool.access(page_id, None)
             curr_page.write(columns[x-3])
+            self.table.original_values[self.table.rid].append(columns[x-3])
             # set dirty bit
             #curr_page.is_dirty = True
 
@@ -216,18 +219,18 @@ class Query:
         rid = self.table.key_dict[primary_key]
         # get base page indexes
         base_page_range, base_page, base_slot = self.table.page_directory[rid]
-        binary_list = ['0'] * 8
+        binary_list = ['0'] * 16
         if (self.table.merged_range == base_page_range and rid in self.table.pra[base_page_range][1]) or (self.table.tps.get(rid) != None):
             if rid in self.table.se_tps:
                 base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
                 curr_base_page = self.table.bufferpool.access(base_page_id, None)
-                binary_list = list(f'{curr_base_page.read(base_slot):08b}') 
+                binary_list = list(f'{curr_base_page.read(base_slot):016b}') 
             else:
                 self.table.se_tps.add(rid)
         else:
             base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
             curr_base_page = self.table.bufferpool.access(base_page_id, None)
-            binary_list = list(f'{curr_base_page.read(base_slot):08b}') #might wanna scale for more columns
+            binary_list = list(f'{curr_base_page.read(base_slot):016b}') #might wanna scale for more columns
 
         num_tail_pages = self.table.pra[base_page_range][0]
         # if number of tail pages is 0, add tail page
@@ -327,6 +330,7 @@ class Query:
         if rid not in self.table.pra[base_page_range][1]:
             self.table.pra[base_page_range][1].add(rid)
             if len(self.table.pra[base_page_range][1]) > 800 and curr_tail_page.num_records == 512:
+                print("Merge condition satisfied")
                 updated_records = self.table.pra[base_page_range][1].copy()
                 self.table.pra[base_page_range][1].clear()
                 threading.Thread(target=self.queue_merge, args=(base_page_range, updated_records,), daemon=True).start()
@@ -339,7 +343,6 @@ class Query:
         self.table.merged_range = page_range
         for record in updated_records:
             self.table.merge(record)
-
 
 
     """
@@ -414,3 +417,125 @@ class Query:
             u = self.update(key, *updated_columns)
             return u
         return False
+
+
+################### FINAL FUNCTIONS #######################
+
+        """
+        # Read a record with specified key
+        # :param index_value: the value of index you want to search
+        # :param index_column: the column number of index you want to search based on
+        # :param query_columns: what columns to return. array of 1 or 0 values.
+        # :param relative_version: the relative version of the record you need to retreive.
+        # Returns a list of Record objects upon success
+        # Returns False if record locked by TPL
+        # Assume that select will never be called on a key that doesn't exist
+        """
+
+    def select_version(self, index_value, index_column, query_columns, relative_version):
+
+        out = []
+        col = index_column + 3 
+        # index = 1
+        # change integer val into array of bytes
+        val = index_value.to_bytes(8, 'big', signed=True)
+
+        #index
+        all_rids = self.table.index.locate(col, index_value)
+
+        #only considering primary select fisrt
+        #so index value is just primary key
+        base_rid = all_rids[0]
+        previous_rid = base_rid
+        final_version_flag = 0
+
+        for current_version in range(0, abs(relative_version)+1):
+            if final_version_flag == 1:     
+                break
+            page_dict = []
+            [needed_range, needed_base, needed_slot] = self.table.page_directory[previous_rid]
+            if previous_rid == base_rid:
+                #First read the indirection column
+                indir_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(1) + "-"
+                indirection = self.table.bufferpool.access(indir_id, None)
+                indirection_value = indirection.read(needed_slot)
+            #Need to read a tail page
+            else: 
+                #First read the indirection column
+                indir_id = "t" + str(needed_range) + "-" + str(needed_base) + "-" + str(1) + "-"
+                indirection = self.table.bufferpool.access(indir_id, None)
+                indirection_value = indirection.read(needed_slot)
+                ##print("indirection value in new condition: " + str(indirection_value))
+
+            # Case 1: if rid was never updated or base record has been reached, i.e. cannot go beyond in history
+            if indirection_value == -1 or indirection_value == base_rid:
+                ##print("Version_iteration: " + str(current_version) + " : in Case 1")
+                [needed_range, needed_base, needed_slot] = self.table.page_directory[base_rid]
+                final_version_flag = 1   #no more versions beyond this
+                for col_new in range(3, len(query_columns)+3):  
+                    if query_columns[col_new - 3] == 1:
+                        query_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(col_new) + "-"
+                        query_page = self.table.bufferpool.access(query_id, None)
+                        page_dict.append(query_page)
+                out.clear()
+                out.append(Record(0,0,self.select_read(needed_slot, page_dict)))
+            
+            # Case 2: if rid was updated, and there is still a tail version to read
+            else:
+                ##print("Version_iteration: " + str(current_version) + " : in Case 2")
+                # get tail page range, tail page, and tail slot from page directory using indirection_value at indirection column of its base page
+                previous_rid = indirection_value
+                tail_page_range, tail_base_page, tail_slot = self.table.page_directory[indirection_value] # wont always be the same range
+                page_dict = []
+                for col_new in range(2, len(query_columns)+2):
+                    if query_columns[col_new - 2] == 1:
+                        query_id = "t" + str(tail_page_range) + "-" + str(tail_base_page) + "-" + str(col_new) + "-"
+                        query_page = self.table.bufferpool.access(query_id, None)
+                        page_dict.append(query_page)
+
+                out.clear()
+                out.append(Record(0,0,self.select_read(tail_slot, page_dict)))
+            indirection.pin_count -= 1
+
+        return (out)
+
+
+    """
+    :param start_range: int         # Start of the key range to aggregate 
+    :param end_range: int           # End of the key range to aggregate 
+    :param aggregate_columns: int  # Index of desired column to aggregate
+    :param relative_version: the relative version of the record you need to retreive.
+    # this function is only called on the primary key.
+    # Returns the summation of the given range upon success
+    # Returns False if no record exists in the given range
+    """
+
+    def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
+        # add 3 to aggregate_column_index to add for indirection and schema encoding (3 not 2 b/c our columns start at 1 not 0)
+        col = aggregate_column_index + 3
+        # create array of key value pairs from key_dict
+        sorted_keys = sorted(self.table.key_dict.items())
+
+        query_cols = []
+
+        for i in range(0, self.table.num_columns):
+            if i == aggregate_column_index:
+                query_cols.append(1)
+            else:
+                query_cols.append(0)
+
+        sum = 0
+        # loop through each key value pair in array
+        for key, rid in sorted_keys:
+            # break if start_range greater than key
+            if start_range > key: continue
+            # break if key greater than end_range
+            if end_range < key: break
+            
+            select_values = self.select_version(key, self.table.key, query_cols, relative_version)[0].columns
+            sum += select_values[0]
+
+        # if sum is 0 return False as nothing was summed (no records exist in given range)
+        if sum == 0: return False
+
+        return sum

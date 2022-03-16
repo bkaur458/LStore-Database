@@ -1,6 +1,5 @@
 from lstore.db import Database
 from lstore.query import Query
-import sys
 
 from random import choice, randint, sample, seed
 
@@ -10,13 +9,13 @@ db.open('./ECS165')
 # Getting the existing Grades table
 grades_table = db.get_table('Grades')
 
-# create a query class for the grades table 
+# create a query class for the grades table
 query = Query(grades_table)
 
 # dictionary for records to test the database: test directory
 records = {}
 
-number_of_records = 100
+number_of_records = 10000
 number_of_aggregates = 100
 number_of_updates = 1
 
@@ -43,7 +42,6 @@ for key in keys:
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
             error = True
-    #if error and key == 92106429:
     if error:
         print('select error on', key, ':', record.columns, ', correct:', records[key])
 print("Select for version -1 finished")
@@ -56,7 +54,7 @@ for key in keys:
         if column != records[key][i]:
             error = True
     if error:
-        print('select error on', key, ':', record, ', correct:', records[key])
+        print('select error on', key, ':', record.columns, ', correct:', records[key])
 print("Select for version -2 finished")
 
 for key in keys:
@@ -66,7 +64,7 @@ for key in keys:
         if column != updated_records[key][i]:
             error = True
     if error:
-        print('select error on', key, ':', record, ', correct:', records[key])
+        print('select error on', key, ':', record.columns, ', correct:', records[key])
 print("Select for version 0 finished")
 
 for i in range(0, number_of_aggregates):

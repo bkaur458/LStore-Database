@@ -93,7 +93,7 @@ for key in keys:
 
         result = query.select(key, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1])[0].columns
         if correct != result:
-            print('select error on primary key', key, ':', result, ', correct:', correct)
+            #print('select error on primary key', key, ':', result, ', correct:', correct)
             score -= 1
     except:
         print('Record Not found', key)

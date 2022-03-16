@@ -151,10 +151,20 @@ class Bufferpool:
         with open(name, "wb") as f:
             pickle.dump(table.deleted_keys, f)
 
+        name = os.path.join(curr_path, 'original_values.pickle')
+        with open(name, "wb") as f:
+            pickle.dump(table.original_values, f)
+
         # write num of ranges
         name = os.path.join(curr_path, 'num_of_ranges.txt')
         with open(name, "w") as f:
             f.write(str(table.num_of_ranges))
+
+        # write key column
+        name = os.path.join(curr_path, 'rid.txt')
+        f = open(name, "wb")
+        f.seek(0)
+        f.write(bytearray((table.rid).to_bytes(4, 'big', signed=True)))       
 
         # write num base pages
         name = os.path.join(curr_path, 'num_base_pages.txt')
