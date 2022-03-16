@@ -472,13 +472,15 @@ class Query:
                 ##print("Version_iteration: " + str(current_version) + " : in Case 1")
                 [needed_range, needed_base, needed_slot] = self.table.page_directory[base_rid]
                 final_version_flag = 1   #no more versions beyond this
-                for col_new in range(3, len(query_columns)+3):  
-                    if query_columns[col_new - 3] == 1:
-                        query_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(col_new) + "-"
-                        query_page = self.table.bufferpool.access(query_id, None)
-                        page_dict.append(query_page)
+
+                original_values = self.table.original_values[base_rid]
+                final_values = [] 
+
+                for col_new in range(0, len(query_columns)):  
+                    if query_columns[col_new] == 1:
+                        final_values.append(original_values[col_new])
                 out.clear()
-                out.append(Record(0,0,self.select_read(needed_slot, page_dict)))
+                out.append(Record(0,0, final_values))
             
             # Case 2: if rid was updated, and there is still a tail version to read
             else:
