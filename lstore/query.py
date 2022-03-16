@@ -1,11 +1,9 @@
-from email.mime import base
 import queue
-from typing import final
 from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
 import threading
-import sys
+
 
 
 class Query:
@@ -66,9 +64,6 @@ class Query:
     # 1 = indirection & 2 = schema // null check
     # insert a record into base page with specified slot values for corresponding columns
     def insert(self, *columns):
-
-        # if columns[0] in self.table.key_dict.keys():
-        #     return False
         # get current page range, current page dictionary, current base page count
         key_column = self.table.key
         # if self.table.key_dict.get(columns[key_column]) != None: return False
@@ -89,12 +84,22 @@ class Query:
 
         # print(self.table.curr_range.num_base_pages)
         for x in range(3, len(columns)+3):
-            self.table.index.insert(self.table.rid, columns[x-3], x)  #issue shared table.rid
+            self.table.index.insert(self.table.rid, columns[x-3], x)
             page_id = "b" + str(self.table.num_of_ranges) + "-" + str(curr_base_page) + "-" + str(x) + "-"
             curr_page = self.table.bufferpool.access(page_id, None)
             curr_page.write(columns[x-3])
             # set dirty bit
             #curr_page.is_dirty = True
+
+            # insert record into index
+            # if index doesn't exist, create one
+            # if self.table.index.indices[x-3]:
+            #     self.table.index.create_index(x-3)
+            # rid = self.table.rid
+            # slot = curr_page.num_records
+            # value = curr_page.data[slot*8 : (slot*8+8)]
+            # self.table.index.insert(rid, value, x-3)
+
             curr_page.pin_count -= 1
 
         # write 0 to schema encoding column, since initially inserted records have never been updated
@@ -114,6 +119,14 @@ class Query:
         self.table.key_dict[columns[key_column]] = self.table.rid
         self.table.page_directory[self.table.rid] = [self.table.num_of_ranges, curr_base_page, curr_page.num_records-1]
         
+        #add TPS = 0 for all base pages initially
+        '''
+        if self.table.num_of_ranges not in self.table.tps_data.keys():
+            self.table.tps_data[self.table.num_of_ranges] = {}
+            for i in range (1,17):
+                # all base pages will have initial TPS value of 0
+                self.table.tps_data[self.table.num_of_ranges][i] = 0
+        '''
         self.table.rid += 1
 
         return True, self.table.rid - 1
@@ -144,6 +157,7 @@ class Query:
 
         #index
         all_rids = self.table.index.locate(col, index_value)
+        #index
 
         # go through all the records that have the needed value for a given column
         for a_rid in all_rids:
@@ -154,7 +168,6 @@ class Query:
             rid = indirection.read(needed_slot)
 
             if -1 == rid or self.table.tps.get(a_rid) == rid:
-            # if -1 == rid or 0==rid:
                 for col_new in range(3, len(query_columns)+3):  
                     if query_columns[col_new - 3] == 1:
                         query_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(col_new) + "-"
@@ -203,24 +216,18 @@ class Query:
         rid = self.table.key_dict[primary_key]
         # get base page indexes
         base_page_range, base_page, base_slot = self.table.page_directory[rid]
-
-        #print("\nUpdate no: " + str(update_no))
-
-        #if (self.table.tps.get(rid) != None):
-            #print("\nTPS of the Rid in the beginning of update")
-            #print(self.table.tps.get(rid))
-        binary_list = ['0'] * 16
+        binary_list = ['0'] * 8
         if (self.table.merged_range == base_page_range and rid in self.table.pra[base_page_range][1]) or (self.table.tps.get(rid) != None):
             if rid in self.table.se_tps:
                 base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
                 curr_base_page = self.table.bufferpool.access(base_page_id, None)
-                binary_list = list(f'{curr_base_page.read(base_slot):016b}') 
+                binary_list = list(f'{curr_base_page.read(base_slot):08b}') 
             else:
                 self.table.se_tps.add(rid)
         else:
             base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
             curr_base_page = self.table.bufferpool.access(base_page_id, None)
-            binary_list = list(f'{curr_base_page.read(base_slot):016b}') #might wanna scale for more columns
+            binary_list = list(f'{curr_base_page.read(base_slot):08b}') #might wanna scale for more columns
 
         num_tail_pages = self.table.pra[base_page_range][0]
         # if number of tail pages is 0, add tail page
@@ -235,15 +242,17 @@ class Query:
         else:
             tail_page_id = "t" + str(base_page_range) + "-" + str(num_tail_pages) + "-" + str(len(columns)) + "-"
             curr_tail_page = self.table.bufferpool.access(tail_page_id, None)
+            
             if not curr_tail_page.has_capacity():
                 for col in range(1, self.table.num_columns + 2):
                     curr_page = Page(base_page_range, num_tail_pages + 1, col, 0, None)
                     self.table.bufferpool.access(curr_page.page_id, curr_page)
                     curr_page.pin_count -= 1
+
                 self.table.pra[base_page_range][0] += 1
                 num_tail_pages += 1
-            curr_tail_page.pin_count -= 1
 
+            curr_tail_page.pin_count -= 1
         if columns[key_column] != None:
             # set value of key_dict at column of primary key column to the value of the rid at primary_key
             self.table.key_dict[columns[key_column]] = self.table.key_dict.pop(primary_key)
@@ -251,12 +260,13 @@ class Query:
 
         base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(1) + "-"
         curr_base_page = self.table.bufferpool.access(base_page_id, None)
-        # original indirection value before update
         tail_page_indirection = curr_base_page.read(base_slot)
         # change indirection column of current base record to point to the new tail page rid
-        curr_base_page.overwrite(base_slot, self.table.rid)
-        curr_base_page.pin_count -= 1     
+        saved_tail_rid = self.table.rid
+        #saved_tail_records = 
+        curr_base_page.overwrite(base_slot, saved_tail_rid)
 
+        curr_base_page.pin_count -= 1       
         # loop through columns, start at column 3 because columns 1-2 are for indirection and schema encoding
         for x in range(3, len(columns) + 3):
             # if column value at index is None, don't update that column (cumulative tail records)  
@@ -295,46 +305,42 @@ class Query:
                 curr_tail_page.write(columns[x-3])
                 curr_tail_page.pin_count -= 1
                 if binary_list[x-3] == '0':
-                    binary_list[x-3] = '1'
+                    binary_list[x-3] = '1' 
+                    # if rid == 8646:
+                    #     print(binary_list, columns[x-3])
 
         base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
         curr_base_page = self.table.bufferpool.access(base_page_id, None)
         curr_base_page.overwrite(base_slot, (int(''.join(str(e) for e in binary_list), 2)))  
         curr_base_page.pin_count -= 1
 
-        #Let new tail record point to the previous one
+                
+        # update page directory
+        #if curr_page_range.num_tail_pages > 16:
+            #print (self.table.num_of_ranges, curr_page_range.num_tail_pages)
         tail_page_id = "t" + str(base_page_range) + "-" + str(num_tail_pages) + "-" + str(1) + "-"
         curr_tail_page = self.table.bufferpool.access(tail_page_id, None)
-        #Have the first tail record point to the base rid
-        if tail_page_indirection == -1:
-            base_rid = self.table.key_dict[primary_key]
-            tail_page_indirection = base_rid
-        curr_tail_page.write(tail_page_indirection) #first update will be base rid
-        self.table.page_directory[self.table.rid] = [base_page_range, num_tail_pages, curr_tail_page.num_records - 1]
+        curr_tail_page.write(tail_page_indirection) #first update will be -1 // not sure what we want
+        self.table.page_directory[saved_tail_rid] = [base_page_range, num_tail_pages, curr_tail_page.num_records - 1]
 
         # increment rid
         if rid not in self.table.pra[base_page_range][1]:
             self.table.pra[base_page_range][1].add(rid)
-            '''
-            print("\n\nself.table.pra[base_page_range][1] " + str(self.table.pra[base_page_range][1]))
-            print("len: " + str(len(self.table.pra[base_page_range][1])))
-            print("curr_tail_page.num_records " + str(curr_tail_page.num_records))
-            '''
             if len(self.table.pra[base_page_range][1]) > 800 and curr_tail_page.num_records == 512:
-                print("Condition for merge satisfied")
                 updated_records = self.table.pra[base_page_range][1].copy()
                 self.table.pra[base_page_range][1].clear()
-                threading.Thread(target=self.queue_merge, args=(base_page_range, updated_records), daemon=True).start()
+                threading.Thread(target=self.queue_merge, args=(base_page_range, updated_records,), daemon=True).start()
         curr_tail_page.pin_count -= 1
 
         self.table.rid += 1
         return True
 
     def queue_merge(self, page_range, updated_records):
-        #print("**********\nQUEUE MERGE HAPPENING************")
         self.table.merged_range = page_range
         for record in updated_records:
             self.table.merge(record)
+
+
 
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -384,126 +390,6 @@ class Query:
                 sum += curr_tail_page.read(tail_slot)
                 curr_tail_page.pin_count -= 1
                 # print('3: ', curr_tail_page.pin_count)
-
-        # if sum is 0 return False as nothing was summed (no records exist in given range)
-        if sum == 0: return False
-
-        return sum
-
-    """
-        # Read a record with specified key
-        # :param index_value: the value of index you want to search
-        # :param index_column: the column number of index you want to search based on
-        # :param query_columns: what columns to return. array of 1 or 0 values.
-        # :param relative_version: the relative version of the record you need to retreive.
-        # Returns a list of Record objects upon success
-        # Returns False if record locked by TPL
-        # Assume that select will never be called on a key that doesn't exist
-        """
-
-    def select_version(self, index_value, index_column, query_columns, relative_version):
-
-        out = []
-        #continue execution if the index_column is not the primary key of the table
-        col = index_column + 3 
-        # index = 1
-        # change integer val into array of bytes
-        val = index_value.to_bytes(8, 'big', signed=True)
-
-        #index
-        all_rids = self.table.index.locate(col, index_value)
-
-        #only considering primary select fisrt
-        #so index value is just primary key
-        base_rid = all_rids[0]
-        previous_rid = base_rid
-        final_version_flag = 0
-
-        for current_version in range(0, abs(relative_version)+1):
-            if final_version_flag == 1:       #TODO: make sure this breaks out the for loop
-                break
-            page_dict = []
-            [needed_range, needed_base, needed_slot] = self.table.page_directory[previous_rid]
-            if previous_rid == base_rid:
-                #First read the indirection column
-                indir_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(1) + "-"
-                indirection = self.table.bufferpool.access(indir_id, None)
-                indirection_value = indirection.read(needed_slot)
-            #Need to read a tail page
-            else: 
-                #First read the indirection column
-                indir_id = "t" + str(needed_range) + "-" + str(needed_base) + "-" + str(1) + "-"
-                indirection = self.table.bufferpool.access(indir_id, None)
-                indirection_value = indirection.read(needed_slot)
-                ##print("indirection value in new condition: " + str(indirection_value))
-
-            # Case 1: if rid was never updated or base record has been reached, i.e. cannot go beyond in history
-            if indirection_value == -1 or indirection_value == base_rid:
-                ##print("Version_iteration: " + str(current_version) + " : in Case 1")
-                [needed_range, needed_base, needed_slot] = self.table.page_directory[base_rid]
-                final_version_flag = 1   #no more versions beyond this
-                for col_new in range(3, len(query_columns)+3):  
-                    if query_columns[col_new - 3] == 1:
-                        query_id = "b" + str(needed_range) + "-" + str(needed_base) + "-" + str(col_new) + "-"
-                        query_page = self.table.bufferpool.access(query_id, None)
-                        page_dict.append(query_page)
-                out.clear()
-                out.append(Record(0,0,self.select_read(needed_slot, page_dict)))
-            
-            # Case 2: if rid was updated, and there is still a tail version to read
-            else:
-                ##print("Version_iteration: " + str(current_version) + " : in Case 2")
-                # get tail page range, tail page, and tail slot from page directory using indirection_value at indirection column of its base page
-                previous_rid = indirection_value
-                tail_page_range, tail_base_page, tail_slot = self.table.page_directory[indirection_value] # wont always be the same range
-                page_dict = []
-                for col_new in range(2, len(query_columns)+2):
-                    if query_columns[col_new - 2] == 1:
-                        query_id = "t" + str(tail_page_range) + "-" + str(tail_base_page) + "-" + str(col_new) + "-"
-                        query_page = self.table.bufferpool.access(query_id, None)
-                        page_dict.append(query_page)
-
-                out.clear()
-                out.append(Record(0,0,self.select_read(tail_slot, page_dict)))
-            indirection.pin_count -= 1
-
-        return (out)
-
-
-    """
-    :param start_range: int         # Start of the key range to aggregate 
-    :param end_range: int           # End of the key range to aggregate 
-    :param aggregate_columns: int  # Index of desired column to aggregate
-    :param relative_version: the relative version of the record you need to retreive.
-    # this function is only called on the primary key.
-    # Returns the summation of the given range upon success
-    # Returns False if no record exists in the given range
-    """
-
-    def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
-        # add 3 to aggregate_column_index to add for indirection and schema encoding (3 not 2 b/c our columns start at 1 not 0)
-        col = aggregate_column_index + 3
-        # create array of key value pairs from key_dict
-        sorted_keys = sorted(self.table.key_dict.items())
-
-        query_cols = []
-
-        for i in range(0, self.table.num_columns):
-            if i == aggregate_column_index:
-                query_cols.append(1)
-            else:
-                query_cols.append(0)
-
-        sum = 0
-        # loop through each key value pair in array
-        for key, rid in sorted_keys:
-            # break if start_range greater than key
-            if start_range > key: continue
-            # break if key greater than end_range
-            if end_range < key: break
-            
-            select_values = self.select_version(key, self.table.key, query_cols, relative_version)[0].columns
-            sum += select_values[0]
 
         # if sum is 0 return False as nothing was summed (no records exist in given range)
         if sum == 0: return False

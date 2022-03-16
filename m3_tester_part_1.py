@@ -48,7 +48,7 @@ for i in range(0, number_of_records):
 
 transaction_workers = []
 for i in range(num_threads):
-    transaction_workers.append(TransactionWorker(i+1))
+    transaction_workers.append(TransactionWorker())
     
 for i in range(number_of_transactions):
     transaction_workers[i % num_threads].add_transaction(insert_transactions[i])

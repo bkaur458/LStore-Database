@@ -26,6 +26,19 @@ class Transaction:
         self.query_obj = None
         self.locked_rids = set()
 
+    '''
+    Stack logic for now:
+    If a query runs successfully:
+        add to log and then append to the stack
+    If a query fails:
+        call abort
+    If a commit happens:
+        write to disk
+        pop all queries from the stack
+    If an abort happens:
+        Go thru each query in the stack, and undo/ redo as needed
+    '''
+
     """
     # Adds the given query to this transaction
     # Example:
@@ -75,7 +88,7 @@ class Transaction:
     '''
 
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
-    def run(self,id):
+    def run(self):
         fin = open("log.txt", "a+b")
         counter = 0
         for query, args in self.queries:
@@ -83,7 +96,6 @@ class Transaction:
             counter += 1
             # Select could fail if its trying to read a record that another xcat has an exclusive lock for
             if("select" in str(query)):
-                print("-----thread: " + str(id) + " xcat: " + str( self.transaction_id) + " selecting : " + str(args[0]))
                 all_rids = self.table.index.locate(args[1] + 3, args[0])
                 result1 = all(element == all_rids[0] for element in all_rids)
                 if result1:
@@ -111,7 +123,6 @@ class Transaction:
                 # If the query has failed the transaction should abort
                 if result == False:
                     return self.abort()
-
             elif("sum" in str(query)):
                 start_range = args[0]
                 end_range = args[1]
@@ -159,11 +170,8 @@ class Transaction:
 
                 #---------ACTION 1 ---------#
                 if("insert" in str(query)):
-
-                    print("-----thread: " + str(id) + " xcat: " + str( self.transaction_id) + " inserting : " + str(args[0]))
-
                     # if False (afka transaction aborted), then return
-                    rid, res = query(*args)
+                    rid = query(*args)[1]
                     #print(rid)
                     if not self.table.set_exclusive_rid(rid, self.locked_rids):
                         self.abort()
@@ -203,7 +211,6 @@ class Transaction:
                         fin.write(bytearray((args[col_no]).to_bytes(8, 'big', signed=True)))
                 #---------ACTION 2 ---------#
                 elif("update" in str(query)):
-                    print("-----thread: " + str(id) + " xcat: " + str( self.transaction_id) + " updating : " + str(args[0]) + " to " + str(args))
                     result = query(*args)
                     rid = self.table.key_dict[args[0]]
                     # if False (aka transaction aborted), then return
@@ -305,8 +312,6 @@ class Transaction:
         return self.commit()
 
     def abort(self):
-
-        print("**********thread: " + str(id) + " xcat: " + str( self.transaction_id) + " aborting ")
         #We start from the top of the stack. i.e. most recently inserted values for now
         # print(self.table.lock_manager)
         while len(self.stack)>0:
