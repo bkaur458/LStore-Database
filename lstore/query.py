@@ -292,18 +292,18 @@ class Query:
         rid = self.table.key_dict[primary_key]
         # get base page indexes
         base_page_range, base_page, base_slot = self.table.page_directory[rid]
-        binary_list = ['0'] * 8
+        binary_list = ['0'] * 16
         if (self.table.merged_range == base_page_range and rid in self.table.pra[base_page_range][1]) or (self.table.tps.get(rid) != None):
             if rid in self.table.se_tps:
                 base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
                 curr_base_page = self.table.bufferpool.access(base_page_id, None)
-                binary_list = list(f'{curr_base_page.read(base_slot):08b}') 
+                binary_list = list(f'{curr_base_page.read(base_slot):016b}') 
             else:
                 self.table.se_tps.add(rid)
         else:
             base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
             curr_base_page = self.table.bufferpool.access(base_page_id, None)
-            binary_list = list(f'{curr_base_page.read(base_slot):08b}') #might wanna scale for more columns
+            binary_list = list(f'{curr_base_page.read(base_slot):016b}') #might wanna scale for more columns
 
         num_tail_pages = self.table.pra[base_page_range][0]
         # if number of tail pages is 0, add tail page

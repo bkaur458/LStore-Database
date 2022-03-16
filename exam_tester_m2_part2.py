@@ -10,7 +10,7 @@ db.open('./ECS165')
 # Getting the existing Grades table
 grades_table = db.get_table('Grades')
 
-# create a query class for the grades table
+# create a query class for the grades table 
 query = Query(grades_table)
 
 # dictionary for records to test the database: test directory
@@ -45,11 +45,10 @@ for key in keys:
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
             error = True
-    if error and key == 92106429:
+    #if error and key == 92106429:
+    if error:
         print('select error on', key, ':', record.columns, ', correct:', records[key])
 print("Select for version -1 finished")
-
-sys.exit()
 
 # Check records that were presisted in part 1
 for key in keys:
@@ -71,6 +70,8 @@ for key in keys:
     if error:
         print('select error on', key, ':', record, ', correct:', records[key])
 print("Select for version 0 finished")
+
+sys.exit()
 
 for i in range(0, number_of_aggregates):
     r = sorted(sample(range(0, len(keys)), 2))

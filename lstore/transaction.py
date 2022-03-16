@@ -87,7 +87,7 @@ class Transaction:
     '''
 
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
-    def run(self, id):
+    def run(self):
 
         fin = open("log.txt", "a+b")
         for query, args in self.queries:
@@ -261,8 +261,8 @@ class Transaction:
                     #     print("Inserted failed on: " + str(args[0]))
                     return self.abort()
 
-                if("insert" in str(query) and args[0]==92106429 ):
-                    print("Inserted key: " + str(args[0]))
+                # if("insert" in str(query) and args[0]==92106429 ):
+                #     print("Inserted key: " + str(args[0]))
 
                 #Only if query successful, append to the stack
                 self.stack.append(query_entry_for_stack)

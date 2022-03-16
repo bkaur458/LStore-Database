@@ -111,7 +111,7 @@ class Table:
         base_page_range, base_page, base_slot = self.page_directory[record]
         base_page_id1 = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(2) + "-"
         curr_base_page1 = self.bufferpool.access(base_page_id1, None)
-        binary_list = list(f'{curr_base_page1.read(base_slot):08b}')
+        binary_list = list(f'{curr_base_page1.read(base_slot):016b}')
         curr_base_page1.pin_count -= 1
 
         base_page_id = "b" + str(base_page_range) + "-" + str(base_page) + "-" + str(1) + "-"
