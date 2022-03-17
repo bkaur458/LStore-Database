@@ -102,7 +102,7 @@ class Table:
             # metadata_path = os.path.join(curr_path, 'rid.txt')
             # with open(metadata_path, "rb") as f:
             #     f.seek(0)
-            #     rid = f.read(4)
+            #     rid = f.read(8)
             #     self.rid = int.from_bytes(rid, byteorder='big', signed=True)
 
         # stores physical page id as key and page range no, main page no, page no as a list of values

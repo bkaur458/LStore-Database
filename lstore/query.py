@@ -244,6 +244,7 @@ class Query:
         # if tail page doesn't have capacity for one more record, add tail page
         else:
             tail_page_id = "t" + str(base_page_range) + "-" + str(num_tail_pages) + "-" + str(len(columns)) + "-"
+            #curr_page = Page(base_page_range, num_tail_pages+1, col, 0, None)
             curr_tail_page = self.table.bufferpool.access(tail_page_id, None)
             
             if not curr_tail_page.has_capacity():

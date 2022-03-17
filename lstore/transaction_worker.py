@@ -10,7 +10,7 @@ class TransactionWorker:
     """
     def __init__(self, transactions = []):
         self.stats = []
-        self.transactions = transactions
+        self.transactions = []
         self.result = 0
         self.t = None
         pass

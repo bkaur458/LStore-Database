@@ -157,14 +157,14 @@ class Bufferpool:
 
         # write num of ranges
         name = os.path.join(curr_path, 'num_of_ranges.txt')
-        with open(name, "w") as f:
+        with open(name, "w") as f: 
             f.write(str(table.num_of_ranges))
 
         # write key column
         name = os.path.join(curr_path, 'rid.txt')
         f = open(name, "wb")
         f.seek(0)
-        f.write(bytearray((table.rid).to_bytes(4, 'big', signed=True)))       
+        f.write(bytearray((table.rid).to_bytes(8, 'big', signed=True)))       
 
         # write num base pages
         name = os.path.join(curr_path, 'num_base_pages.txt')
