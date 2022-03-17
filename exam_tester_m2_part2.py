@@ -17,7 +17,7 @@ records = {}
 
 number_of_records = 10000
 number_of_aggregates = 100
-number_of_updates = 1
+number_of_updates = 3
 
 seed(3562901)
 for i in range(0, number_of_records):
@@ -42,7 +42,7 @@ for key in keys:
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
             error = True
-    if error:
+    if error and key == 92106429:
         print('select error on', key, ':', record.columns, ', correct:', records[key])
 print("Select for version -1 finished")
 
@@ -53,7 +53,7 @@ for key in keys:
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
             error = True
-    if error:
+    if error and key == 92106429:
         print('select error on', key, ':', record.columns, ', correct:', records[key])
 print("Select for version -2 finished")
 
@@ -63,7 +63,7 @@ for key in keys:
     for i, column in enumerate(record.columns):
         if column != updated_records[key][i]:
             error = True
-    if error:
+    if error and key == 92106429:
         print('select error on', key, ':', record.columns, ', correct:', records[key])
 print("Select for version 0 finished")
 

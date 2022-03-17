@@ -21,13 +21,15 @@ records = {}
 
 number_of_records = 10000
 number_of_aggregates = 100
-number_of_updates = 1
+number_of_updates = 3
 
 seed(3562901)
 
 for i in range(0, number_of_records):
     key = 92106429 + i
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
+    if key == 92106429:
+        print(records[key])
     query.insert(*records[key])
 keys = sorted(list(records.keys()))
 print("Insert finished")
@@ -61,6 +63,9 @@ for _ in range(number_of_updates):
         query.update(key, *updated_columns)
         record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
         error = False
+
+        if key == 92106429:
+            print(updated_columns)
         for j, column in enumerate(record.columns):
             if column != records[key][j]:
                 error = True
