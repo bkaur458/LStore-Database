@@ -49,10 +49,27 @@ for key in keys:
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
             error = True
-    if error:
+    if error: 
         print('select error on', key, ':', record, ', correct:', records[key])
 print("Select finished")
 
+print("\nTesting Final Starts\n")
+record = query.select_version(92106429, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 0)[0]
+print(record.columns)
+
+record = query.select_version(92106429, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], -1)[0]
+print(record.columns)
+
+record = query.select_version(92106429, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], -2)[0]
+print(record.columns)
+
+record = query.select_version(92106429, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], -3)[0]
+print(record.columns)
+
+record = query.select_version(92106429, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], -15)[0]
+print(record.columns)
+
+print("\nTesting Final Ends\n")
 
 for i in range(0, number_of_aggregates):
     r = sorted(sample(range(0, len(keys)), 2))

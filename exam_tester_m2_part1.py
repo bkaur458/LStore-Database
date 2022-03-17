@@ -21,7 +21,7 @@ records = {}
 
 number_of_records = 10000
 number_of_aggregates = 100
-number_of_updates = 3
+number_of_updates = 5
 
 seed(3562901)
 
@@ -60,12 +60,12 @@ for _ in range(number_of_updates):
             updated_columns[i] = value
             # update our test directory
             records[key][i] = value
+        if key == 92106429:
+            print(updated_columns)
         query.update(key, *updated_columns)
         record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
         error = False
 
-        if key == 92106429:
-            print(updated_columns)
         for j, column in enumerate(record.columns):
             if column != records[key][j]:
                 error = True

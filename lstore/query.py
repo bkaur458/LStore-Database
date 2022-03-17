@@ -330,7 +330,7 @@ class Query:
         if rid not in self.table.pra[base_page_range][1]:
             self.table.pra[base_page_range][1].add(rid)
             if len(self.table.pra[base_page_range][1]) > 800 and curr_tail_page.num_records == 512:
-                print("Merge condition satisfied")
+                #print("Merge condition satisfied")
                 updated_records = self.table.pra[base_page_range][1].copy()
                 self.table.pra[base_page_range][1].clear()
                 threading.Thread(target=self.queue_merge, args=(base_page_range, updated_records,), daemon=True).start()

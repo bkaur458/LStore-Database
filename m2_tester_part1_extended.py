@@ -38,6 +38,9 @@ for i in range(0, number_of_records):
                     randint(0, 440),
                     randint(0, 340)]
     query.insert(*records[key])
+    ##TEST
+    if key == 92106429:
+        print(records[key])
 keys = sorted(list(records.keys()))
 print("Insert finished")
 
@@ -77,6 +80,9 @@ for _ in range(number_of_updates):
             original = records[key].copy()
             # update our test directory
             records[key][i] = value
+            ##TEST
+            if key == 92106429:
+                print(updated_columns)
             query.update(key, *updated_columns)
             record = query.select(key, 0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1])[0]
             error = False
